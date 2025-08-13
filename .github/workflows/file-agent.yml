@@ -1,0 +1,148 @@
+name: Repo File Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Command: list or show'
+        required: true
+        default: 'list'
+      path:
+        description: 'Directory path for list (default: src)'
+        required: false
+        default: 'src'
+      file:
+        description: 'File path for show (e.g., src/main.tsx)'
+        required: false
+        default: ''
+      ref:
+        description: 'Git ref/branch/SHA to check out (default: repo default or PR head)'
+        required: false
+        default: ''
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  file-agent:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '/file-agent'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse command and determine ref
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const core = require('@actions/core');
+
+            function parseSlash(body) {
+              const line = body.split('\n').find(l => l.trim().startsWith('/file-agent'));
+              if (!line) return null;
+              const parts = line.trim().split(/\s+/);
+              const action = parts[1] || 'list';
+              if (action !== 'list' && action !== 'show') return null;
+              if (action === 'list') {
+                return { command: 'list', path: parts[2] || 'src', ref: parts[3] || '' };
+              } else {
+                return { command: 'show', file: parts[2] || '', ref: parts[3] || '' };
+              }
+            }
+
+            let command = core.getInput('command') || '';
+            let path = core.getInput('path') || '';
+            let file = core.getInput('file') || '';
+            let ref = core.getInput('ref') || '';
+
+            if (context.eventName === 'issue_comment') {
+              const parsed = parseSlash(context.payload.comment.body || '');
+              if (!parsed) {
+                core.setFailed('No valid /file-agent command found.');
+                return;
+              }
+              command = parsed.command;
+              path = parsed.path || path;
+              file = parsed.file || file;
+              ref = parsed.ref || ref;
+            }
+
+            let checkoutRef = ref;
+
+            if (context.eventName === 'issue_comment' && context.payload.issue && context.payload.issue.pull_request) {
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.issue.number
+              });
+              if (!checkoutRef) {
+                checkoutRef = pr.data.head.sha;
+              }
+              core.setOutput('pr_number', String(pr.data.number));
+            }
+
+            core.setOutput('command', command);
+            core.setOutput('path', path);
+            core.setOutput('file', file);
+            core.setOutput('ref', checkoutRef);
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.parse.outputs.ref }}
+      - name: Ensure Node is available
+        run: node -v
+      - name: Run list (directory)
+        if: ${{ steps.parse.outputs.command == 'list' }}
+        run: |
+          node .github/scripts/list-tree.mjs "${{ steps.parse.outputs.path }}"
+        env:
+          FILE_AGENT_IGNORE: "node_modules,.git,.next,dist,build,.turbo,.cache,.vercel,.output"
+      - name: Run show (file)
+        if: ${{ steps.parse.outputs.command == 'show' }}
+        run: |
+          if [ -z "${{ steps.parse.outputs.file }}" ]; then
+            echo "Missing file path for 'show' command." >&2
+            exit 1
+          fi
+          node .github/scripts/get-file.mjs "${{ steps.parse.outputs.file }}"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-agent-output
+          path: file-agent/**
+          if-no-files-found: warn
+      - name: Comment results (PR/Issue)
+        if: ${{ github.event_name == 'issue_comment' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const isList = '${{ steps.parse.outputs.command }}' === 'list';
+            const filePath = isList ? 'file-agent/listing.md' : 'file-agent/file.md';
+            if (!fs.existsSync(filePath)) {
+              core.setFailed(`Output file not found: ${filePath}`);
+            } else {
+              const body = fs.readFileSync(filePath, 'utf8');
+              const chunks = [];
+              const limit = 60000;
+              for (let i = 0; i < body.length; i += limit) {
+                chunks.push(body.slice(i, i + limit));
+              }
+              const issue = context.payload.issue;
+              for (let i = 0; i < chunks.length; i++) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: chunks[i]
+                });
+              }
+            }
