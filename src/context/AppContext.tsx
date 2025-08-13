@@ -1,5 +1,6 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
-import { AppContextType, User, Client, Job, Candidate, Person, CandidateProfile, ClientContact } from '../types';
+import type { ReactNode} from 'react';
+import { createContext, useState, useContext, useEffect } from 'react';
+import type { AppContextType, User, Client, Job, Candidate, Person, CandidateProfile, ClientContact, NewContactInput } from '../types';
 
 import { MOCK_USERS_DB } from '../data/users';
 import { MOCK_CANDIDATES_DB } from '../data/candidates';
@@ -19,10 +20,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     // Data state
     const [clients, setClients] = useState<Client[]>(MOCK_CLIENTS_DB);
-    const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS_DB);
-    const [candidates, setCandidates] = useState<Candidate[]>(MOCK_CANDIDATES_DB);
+    const [jobs] = useState<Job[]>(MOCK_JOBS_DB);
+    const [candidates] = useState<Candidate[]>(MOCK_CANDIDATES_DB);
     const [people, setPeople] = useState<Person[]>(MOCK_PEOPLE_DB);
 
+    useEffect(() => {
+      let t: number | undefined;
+      return () => {
+        if (t) window.clearTimeout(t);
+      };
+    }, []);
+
+    const showToast = (message: string) => {
+        setToastMessage(message);
+        setTimeout(() => setToastMessage(null), 3000);
+    };
 
     const login = (email: string) => {
         const user = MOCK_USERS_DB.find(u => u.email.toLowerCase() === email.toLowerCase());
@@ -30,7 +42,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             setActiveUser(user);
             navigate('dashboard');
         } else {
-            alert('User not found!');
+            showToast('User not found!');
         }
     };
 
@@ -54,18 +66,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setSelectedCandidateId(null);
     };
 
-    const showToast = (message: string) => {
-        setToastMessage(message);
-        setTimeout(() => setToastMessage(null), 3000);
-    };
-    
-    const addClientContact = (clientId: number, newContact: Omit<ClientContact, 'contactId' | 'personId'>) => {
+    const addClientContact = (clientId: number, newContact: NewContactInput) => {
         const newPersonId = Math.max(...people.map(p => p.personId), 0) + 1;
         const newPerson: Person = { personId: newPersonId, name: newContact.name };
         setPeople([...people, newPerson]);
 
         const newContactId = Math.max(...clients.flatMap(c => c.contacts.map(ct => ct.contactId)), 0) + 1;
-        const contactToAdd: ClientContact = { ...newContact, contactId: newContactId, personId: newPersonId };
+        const contactToAdd: ClientContact = {
+          contactId: newContactId,
+          personId: newPersonId,
+          position: newContact.position,
+          email: newContact.email
+        };
 
         const updatedClients = clients.map(client => {
             if (client.id === clientId) {
@@ -93,8 +105,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const getClients = () => clients;
     const getPeople = () => people;
 
-
-    const value = {
+    const value: AppContextType = {
         activeUser,
         currentPage,
         pageContext,

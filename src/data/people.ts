@@ -1,4 +1,4 @@
-import { Person } from '../types';
+import type { Person } from '../types';
 
 export const MOCK_PEOPLE_DB: Person[] = [
     { personId: 1, name: "Samantha Bee", linkedIn: "linkedin.com/in/samanthabee" },

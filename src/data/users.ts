@@ -1,4 +1,4 @@
-import { User } from '../types';
+import type { User } from '../types';
 
 export const MOCK_USERS_DB: User[] = [
   { id: 1, name: "Recruiter", email: "recruiter@buxton.com", role: "recruiter"},

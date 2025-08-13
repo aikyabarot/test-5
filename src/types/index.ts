@@ -73,10 +73,16 @@ export interface CandidateProfile extends Candidate {
 
 export interface PageProps {
   user: User;
-  onNavigate: (page: string, context?: any) => void;
-  onOpenCandidate: (candidateId: number) => void;
+  onNavigate: (_page: string, _context?: any) => void;
+  onOpenCandidate: (_candidateId: number) => void;
   context?: any;
 }
+
+export type NewContactInput = {
+  name: string;
+  position: string;
+  email: string;
+};
 
 export interface AppContextType {
     activeUser: User | null;
@@ -85,16 +91,16 @@ export interface AppContextType {
     isCandidateModalOpen: boolean;
     selectedCandidateId: number | null;
     toastMessage: string | null;
-    login: (email: string) => void;
+    login: (_email: string) => void;
     logout: () => void;
-    navigate: (page: string, context?: any) => void;
-    openCandidateModal: (candidateId: number) => void;
+    navigate: (_page: string, _context?: any) => void;
+    openCandidateModal: (_candidateId: number) => void;
     closeCandidateModal: () => void;
-    showToast: (message: string) => void;
-    addClientContact: (clientId: number, newContact: Omit<ClientContact, 'contactId' | 'personId'>) => void;
-    getCandidateProfile: (candidateId: number) => CandidateProfile | undefined;
-    getClient: (clientId: number) => Client | undefined;
-    getJobsForClient: (clientId: number) => Job[];
+    showToast: (_message: string) => void;
+    addClientContact: (_clientId: number, _newContact: NewContactInput) => void;
+    getCandidateProfile: (_candidateId: number) => CandidateProfile | undefined;
+    getClient: (_clientId: number) => Client | undefined;
+    getJobsForClient: (_clientId: number) => Job[];
     getOpenJobsCount: () => number;
     getJobs: () => Job[];
     getClients: () => Client[];

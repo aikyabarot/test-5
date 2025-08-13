@@ -1,4 +1,3 @@
-import React from 'react';
 import { AppProvider, useAppData } from './context/AppContext';
 import LoginPage from './pages/LoginPage';
 import RootLayout from './layouts/RootLayout';

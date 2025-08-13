@@ -1,4 +1,4 @@
-import { Candidate } from '../types';
+import type { Candidate } from '../types';
 
 export const MOCK_CANDIDATES_DB: Candidate[] = [
     {

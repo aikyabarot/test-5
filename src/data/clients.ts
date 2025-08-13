@@ -1,4 +1,4 @@
-import { Client } from '../types';
+import type { Client } from '../types';
 
 export const MOCK_CLIENTS_DB: Client[] = [
   {
